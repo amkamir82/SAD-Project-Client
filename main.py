@@ -1,4 +1,7 @@
+from client import Client
 def main():
-    pass
+    cl = Client()
+    cl.pull()
+    cl.stop()
 if __name__ == "__main__":
     main()
