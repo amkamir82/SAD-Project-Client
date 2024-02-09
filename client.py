@@ -38,7 +38,9 @@ class Client:
         self.init_api = '/init'
         self.pull_api = '/pull'
         self.push_api = '/write'
-        
+        self.port = 5000
+        self.ip = '127.0.0.1'
+        self.init()
         
     def init(self):
         self.brokers_lock = threading.Lock()
@@ -97,7 +99,7 @@ class Client:
                 str: The ID of the registered subscription.
             """
             url = self.coordinator_url + '/subscribe'
-            response = requests.post(url, json={'name': 'kir'})
+            response = requests.post(url, json={'ip':f'{self.ip}', 'port':f'{self.port}'})
             json = response.json()
             return json['id']
          
@@ -157,6 +159,6 @@ def subscribe(f):
     app.route('/subscribe-' + id, methods=['POST'])(subscription_func_wrapper(f))
     return
 
-app.run(host='0.0.0.0', port=5000, debug=True)
+app.run(host='0.0.0.0', port=client.port, debug=True)
 
 
