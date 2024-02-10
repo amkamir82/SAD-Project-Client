@@ -38,14 +38,14 @@ class Client:
         self.init_api = '/init'
         self.pull_api = '/pull'
         self.push_api = '/write'
-        self.port = 5000
-        self.ip = '127.0.0.1'
+        self.reg_subscribe_api = '/subscribe'
+        self.my_port = 5001
+        self.my_ip = '127.0.0.1'
         self.init()
         
     def init(self):
         self.brokers_lock = threading.Lock()
-        self.brokers = requests.get(self.coordinator_url + self.init_api)
-        
+        self.brokers = requests.get(self.coordinator_url + self.init_api).json()
 
     
     @retry_request()
@@ -59,11 +59,12 @@ class Client:
             Raises:
                 requests.HTTPError: If the response status code is 4xx or 5xx.
             """
-            dest = self.route()
-            url = dest + self.pull_api
+            dest_broker = self.route()
+            url = dest_broker + self.pull_api
             response = requests.get(url)
             response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
             json = response.json()
+            
             return json['key'], json['value']   # Return the response content if request is successful
                                                 # Todo convert to byte?
             
@@ -80,11 +81,12 @@ class Client:
             Returns:
                 dict: The response from the server in JSON format.
             """
-            dest = self.route()
-            url = dest + self.push_api
+            dest_broker = self.route()
+            url = dest_broker + self.push_api
             response = requests.post(url, json={'key': key, 'value': value})
-            response.raise_for_status()
-            return response.json() 
+            print(response.text, response.status_code)
+            response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+            return response.text 
     
     
     def update_brokers(self, brokers):
@@ -98,8 +100,9 @@ class Client:
             Returns:
                 str: The ID of the registered subscription.
             """
-            url = self.coordinator_url + '/subscribe'
-            response = requests.post(url, json={'ip':f'{self.ip}', 'port':f'{self.port}'})
+            url = self.coordinator_url + self.reg_subscribe_api
+            response = requests.post(url, json={'ip':f'{self.my_ip}', 'port':f'{self.my_port}'})
+            print(response.text)
             json = response.json()
             return json['id']
          
@@ -142,7 +145,8 @@ def subscription_func_wrapper(f):
     """
     def f_caller():
         data = request.json
-        return f(data['key'], data['value']) # convert to byte?
+        f(data['key'], data['value']) # convert to byte?
+        return 'Awli'
     return f_caller
     
 def subscribe(f):
@@ -159,6 +163,6 @@ def subscribe(f):
     app.route('/subscribe-' + id, methods=['POST'])(subscription_func_wrapper(f))
     return
 
-app.run(host='0.0.0.0', port=client.port, debug=True)
+threading.Thread(target= lambda: app.run(host='0.0.0.0', port=client.my_port, debug=True, use_reloader=False), daemon=True).start()
 
 

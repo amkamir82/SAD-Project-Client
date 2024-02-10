@@ -1,7 +1,12 @@
-from client import Client
+from client import pull, push, subscribe
 def main():
-    cl = Client()
-    cl.pull()
-    cl.stop()
+    
+    key, val = pull()
+    print(key, val)
+    push('arshia', 'akhavan')
+    subscribe(print)
+    
+    input()
+    
 if __name__ == "__main__":
     main()
