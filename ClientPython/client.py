@@ -1,9 +1,8 @@
 import functools
 import threading
 import time
-from typing import Any
 import random
-import schedule
+import functools
 import requests
 
 from flask import Flask, request, jsonify
@@ -36,19 +35,19 @@ def retry_request(max_retries=5):
 
 class Client:
     def __init__(self):
-        self.coordinator_url = 'http://localhost:5000'
-        self.init_api = '/init'
+        self.coordinator_url = 'http://104.234.196.142:5000'
+        self.init_api = '/client/init_client'
         self.pull_api = '/pull'
         self.push_api = '/write'
         self.reg_subscribe_api = '/subscribe'
-        self.my_port = 5001
+        self.my_port = 5002
         self.my_ip = '127.0.0.1'
         self.init()
 
     def init(self):
         self.brokers_lock = threading.Lock()
         self.brokers = requests.get(self.coordinator_url + self.init_api).json()
-
+        print(self.brokers)
     
     @retry_request()
     def pull(self):
@@ -69,11 +68,12 @@ class Client:
 
         return json['key'], json['value']   # Return the response content if request is successful
                                                 # Todo convert to byte?
-
-    @retry_request()
-    def push(self, key: str, value: Any):
+            
+            
+    @retry_request()    
+    def push(self, key: str, value):
         """
-        Pushes a key-value pair to the server.
+            Pushes a key-value pair to the server.
 
         Args:
             key (str): The key to be pushed.
