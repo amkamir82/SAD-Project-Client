@@ -17,7 +17,7 @@ const regSubscriptionApi = '/subscribe'
 const health_check_api = '/client/healthcheck'
 const myIp = '137.0.0.1'
 const myPort = 5001
-
+const sleepInterval = 3000 
 
 function randomChoice(list) {
     // Check if the list is empty
@@ -137,7 +137,7 @@ async function subscribe(f) {
     const id = await registerSubscription();
     const route = `/subscribe-${id}`
     app.post(route, subscriptionFuncWrapper(f));
-    setInterval(sleepInterval, healthcheck)
+    setInterval(healthcheck, sleepInterval)
 
 }
 
