@@ -8,13 +8,13 @@ const app = express();
 app.use(express.json());
 const port = 5001;
 let brokers = []
-let coordinatorURL = 'http://127.0.0.1:5000';
+let coordinatorURL = 'http://137.0.0.1:5000';
 let backupCoordinatorURL = 'http://127.0.0.1:5000';
 const initApi = '/init'
 const pullApi = '/pull'
 const pushApi = '/write'
 const regSubscriptionApi = '/subscribe'
-const myIp = '127.0.0.1'
+const myIp = '137.0.0.1'
 const myPort = 5001
 
 
@@ -45,11 +45,11 @@ app.post('/update', async (req, res) => {
 function init(){
     try{
         const url = coordinatorURL + initApi;
-        const res = request('GET', url);
+        const res = request('GET', url, {timeout: true});
         if (res.status != 200)
         {
           const backup = backupCoordinatorURL + initApi
-          const res = request('GET', backupCoordinatorURL);
+          const res = request('GET', backup);
           brokers = JSON.parse(res.getBody('utf8'));
 
         } else{
@@ -57,8 +57,14 @@ function init(){
           brokers = JSON.parse(res.getBody('utf8'));
         }
       } catch(error){
-        console.error(error)
-    }
+        try{
+          const backup = backupCoordinatorURL + initApi
+          const res = request('GET', backup);
+          brokers = JSON.parse(res.getBody('utf8'));
+        } catch(err){
+          console.error(err)
+        }
+      }
 }
 
 async function pull() {
