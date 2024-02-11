@@ -10,10 +10,11 @@ const port = 5001;
 let brokers = []
 let coordinatorURL = 'http://137.0.0.1:5000';
 let backupCoordinatorURL = 'http://127.0.0.1:5000';
-const initApi = '/init'
+const initApi = '/client/init'
 const pullApi = '/pull'
 const pushApi = '/write'
 const regSubscriptionApi = '/subscribe'
+const health_check_api = '/client/healthcheck'
 const myIp = '137.0.0.1'
 const myPort = 5001
 
@@ -121,10 +122,23 @@ async function registerSubscription(){
     }
 }
 
+function healthcheck(id){
+    url1 = client.coordinator_url + health_check_api
+    url2 = client.backup_coordinator_url + health_check_api
+    res = axios.post(url1, {'id':id}).then((res) => {
+      if (res.status_code != 200){
+          axios.post(url2, {'id':id})
+      }
+    }).catch((err) => {
+      axios.post(url2, {'id':id})
+    })
+}
 async function subscribe(f) {
-  const id = await registerSubscription();
-  const route = `/subscribe-${id}`
-  app.post(route, subscriptionFuncWrapper(f));
+    const id = await registerSubscription();
+    const route = `/subscribe-${id}`
+    app.post(route, subscriptionFuncWrapper(f));
+    setInterval(sleepInterval, healthcheck)
+
 }
 
 init();
