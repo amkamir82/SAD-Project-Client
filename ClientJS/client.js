@@ -107,7 +107,6 @@ function subscribe(f) {
 }
 
 init();
-
 app.listen(port, () => {
     console.log(brokers)
     console.log(`Client listening on port ${port}`);
