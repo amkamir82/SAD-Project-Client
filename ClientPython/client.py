@@ -1,10 +1,11 @@
+import functools
 import threading
 import time
-import schedule
-import random
-import functools
-import requests
 from typing import Any
+import random
+import schedule
+import requests
+
 from flask import Flask, request, jsonify
 
 
@@ -25,6 +26,7 @@ def retry_request(max_retries=5):
                     return result
                 except requests.RequestException as e:
                     time.sleep(2)
+                    print('Request failed: \n', e)
             print(f"Failed after {max_retries} retries.")
             return None
         return wrapper_retry_request
@@ -42,7 +44,7 @@ class Client:
         self.my_port = 5001
         self.my_ip = '127.0.0.1'
         self.init()
-        
+
     def init(self):
         self.brokers_lock = threading.Lock()
         self.brokers = requests.get(self.coordinator_url + self.init_api).json()
@@ -50,62 +52,61 @@ class Client:
     
     @retry_request()
     def pull(self):
-            """
-            Pulls data from the server using the specified API endpoint.
+        """
+        Pulls data from the server using the specified API endpoint.
 
-            Returns:
-                dict: The response content as a JSON object if the request is successful.
+        Returns:
+            dict: The response content as a JSON object if the request is successful.
 
-            Raises:
-                requests.HTTPError: If the response status code is 4xx or 5xx.
-            """
-            dest_broker = self.route()
-            url = dest_broker + self.pull_api
-            response = requests.get(url)
-            response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
-            json = response.json()
-            
-            return json['key'], json['value']   # Return the response content if request is successful
+        Raises:
+            requests.HTTPError: If the response status code is 4xx or 5xx.
+        """
+        dest_broker = self.route()
+        url = dest_broker + self.pull_api
+        response = requests.get(url)
+        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+        json = response.json()
+
+        return json['key'], json['value']   # Return the response content if request is successful
                                                 # Todo convert to byte?
-            
-            
-    @retry_request()    
+
+    @retry_request()
     def push(self, key: str, value: Any):
-            """
-            Pushes a key-value pair to the server.
+        """
+        Pushes a key-value pair to the server.
 
-            Args:
-                key (str): The key to be pushed.
-                value (Any): The value associated with the key.
+        Args:
+            key (str): The key to be pushed.
+            value (Any): The value associated with the key.
 
-            Returns:
-                dict: The response from the server in JSON format.
-            """
-            dest_broker = self.route()
-            url = dest_broker + self.push_api
-            response = requests.post(url, json={'key': key, 'value': value})
-            print(response.text, response.status_code)
-            response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
-            return response.text 
+        Returns:
+            dict: The response from the server in JSON format.
+        """
+        dest_broker = self.route()
+        url = dest_broker + self.push_api
+        response = requests.post(url, json={'key': key, 'value': value})
+        print(response.text, response.status_code)
+        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+        return response.text
     
     
     def update_brokers(self, brokers):
-       with self.brokers_lock: 
+        with self.brokers_lock:
             self.brokers = brokers
-        
-    def register_subscription(self):
-            """
-            Sends a POST request to the coordinator URL to register a subscription.
 
-            Returns:
-                str: The ID of the registered subscription.
-            """
-            url = self.coordinator_url + self.reg_subscribe_api
-            response = requests.post(url, json={'ip':f'{self.my_ip}', 'port':f'{self.my_port}'})
-            print(response.text)
-            json = response.json()
-            return json['id']
-         
+    def register_subscription(self):
+        """
+        Sends a POST request to the coordinator URL to register a subscription.
+
+        Returns:
+            str: The ID of the registered subscription.
+        """
+        url = self.coordinator_url + self.reg_subscribe_api
+        response = requests.post(url, json={'ip':f'{self.my_ip}', 'port':f'{self.my_port}'})
+        print(response.text)
+        json = response.json()
+        return json['id']
+ 
     def route(self):
         """
         Selects a random broker from the list of brokers.
@@ -115,7 +116,7 @@ class Client:
         """
         with self.brokers_lock:
             return random.choice(self.brokers)
-    
+
 app = Flask(__name__)
 client = Client()
 
@@ -131,7 +132,7 @@ def pull():
 def push(key: str, value):
     return client.push(key, value)
 
-    
+
 def subscription_func_wrapper(f):
     """
     A decorator function that wraps a subscription function.
@@ -148,7 +149,7 @@ def subscription_func_wrapper(f):
         f(data['key'], data['value']) # convert to byte?
         return 'Awli'
     return f_caller
-    
+
 def subscribe(f):
     """
     Subscribes a function to a route and registers a subscription.
@@ -159,10 +160,16 @@ def subscribe(f):
     Returns:
         None
     """
-    id = client.register_subscription()
-    app.route('/subscribe-' + id, methods=['POST'])(subscription_func_wrapper(f))
+    sub_id = client.register_subscription()
+    app.route('/subscribe-' + sub_id, methods=['POST'])(subscription_func_wrapper(f))
     return
 
-threading.Thread(target= lambda: app.run(host='0.0.0.0', port=client.my_port, debug=True, use_reloader=False), daemon=True).start()
-
-
+threading.Thread(
+     target= lambda: app.run(
+          host='0.0.0.0',
+          port=client.my_port,
+          debug=True,
+          use_reloader=False,
+        ),
+        daemon=True
+).start()
