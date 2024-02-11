@@ -90,7 +90,7 @@ class Client:
     
     
     def update_brokers(self, brokers):
-    #    with self.brokers_lock 
+       with self.brokers_lock: 
             self.brokers = brokers
         
     def register_subscription(self):
@@ -113,8 +113,8 @@ class Client:
         Returns:
             str: The selected broker.
         """
-        # with self.brokers_lock:
-        return random.choice(self.brokers)
+        with self.brokers_lock:
+            return random.choice(self.brokers)
     
 app = Flask(__name__)
 client = Client()
