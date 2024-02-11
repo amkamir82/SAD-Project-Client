@@ -5,6 +5,7 @@ const request = require('sync-request')
 
 
 const app = express();
+app.use(express.json());
 const port = 5001;
 let brokers = []
 let coordinatorURL = 'http://127.0.0.1:5000';
@@ -56,7 +57,6 @@ async function pull() {
     try{
         const destBroker = randomChoice(brokers) // http://localhost:6000/
         const url = destBroker + pullApi
-        console.log('url: ' + url)
         const res = await axios.get(url)
         const data = res.data
         return [data['key'], data['value']]
@@ -69,7 +69,6 @@ async function push(key, value) {
     try{
         const destBroker = randomChoice(brokers) // http://localhost:6000/
         const url = destBroker + pushApi
-        console.log('url: ' + url)
         const res = await axios.post(url, {key, value})
         const data = res.data
         return data
@@ -101,15 +100,15 @@ async function registerSubscription(){
     }
 }
 
-function subscribe(f) {
-  const id = registerSubscription();
-  app.post(`/subscribe-${id}`, subscriptionFuncWrapper(f));
+async function subscribe(f) {
+  const id = await registerSubscription();
+  const route = `/subscribe-${id}`
+  app.post(route, subscriptionFuncWrapper(f));
 }
 
 init();
 app.listen(port, () => {
-    console.log(brokers)
-    console.log(`Client listening on port ${port}`);
+  //  console.log(`Client listening on port ${port}`);
 });
 
 module.exports = {
