@@ -6,10 +6,10 @@ import functools
 import requests
 import os
 from dotenv import load_dotenv
-
-load_dotenv()
+from time import sleep
 from flask import Flask, request, jsonify
 
+load_dotenv()
 
 def retry_request(max_retries=5):
     """
@@ -46,6 +46,8 @@ class Client:
         self.reg_subscribe_api = os.getenv('REG_SUBSCRIBE_API')
         self.my_port = os.getenv('MY_PORT')
         self.my_ip = os.getenv('MY_IP')
+        self.health_check_api = os.getenv('HEALTH_CHECK_API')
+        self.sleep_interval = os.getenv('SLEEP_INTERVAL')
         self.init()
 
     def init(self):
@@ -74,7 +76,8 @@ class Client:
         response = requests.get(url)
         response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
         json = response.json()
-
+        
+        
         return json['key'], json['value']   # Return the response content if request is successful
                                                 # Todo convert to byte?
             
@@ -165,6 +168,15 @@ def subscription_func_wrapper(f):
         return 'Awli'
     return f_caller
 
+def healthcheck(id):
+    url1 = client.coordinator_url + client.health_check_api
+    url2 = client.backup_coordinator_url + client.health_check_api
+    while True:
+        res = requests.post(url1, json={'id':id})    
+        if res.status_code != 200:
+            res = requests.post(url2, json={'id':id})
+        sleep(client.sleep_interval)
+
 def subscribe(f):
     """
     Subscribes a function to a route and registers a subscription.
@@ -177,6 +189,12 @@ def subscribe(f):
     """
     sub_id = client.register_subscription()
     app.route('/subscribe-' + sub_id, methods=['POST'])(subscription_func_wrapper(f))
+    threading.Thread(
+        target=healthcheck,
+        args=(sub_id,),
+        daemon=True
+    ).start()
+    
     return
 
 threading.Thread(
