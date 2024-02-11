@@ -4,7 +4,10 @@ import time
 import random
 import functools
 import requests
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 from flask import Flask, request, jsonify
 
 
@@ -35,14 +38,14 @@ def retry_request(max_retries=5):
 
 class Client:
     def __init__(self):
-        self.coordinator_url = 'http://104.234.196.142:5000'
-        self.backup_coordinator_url = 'http://104.234.196.142:5000'
-        self.init_api = '/client/init_client'
-        self.pull_api = '/pull'
-        self.push_api = '/write'
-        self.reg_subscribe_api = '/subscribe'
-        self.my_port = 5002
-        self.my_ip = '127.0.0.1'
+        self.coordinator_url = os.getenv('COORDINATOR_URL')
+        self.backup_coordinator_url = os.getenv('BACKUP_COORDINATOR_URL')
+        self.init_api = os.getenv('INIT_API')
+        self.pull_api = os.getenv('PULL_API')
+        self.push_api = os.getenv('PUSH_API')
+        self.reg_subscribe_api = os.getenv('REG_SUBSCRIBE_API')
+        self.my_port = os.getenv('MY_PORT')
+        self.my_ip = os.getenv('MY_IP')
         self.init()
 
     def init(self):
