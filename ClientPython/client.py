@@ -99,7 +99,7 @@ class Client:
         """
         dest_broker = self.route_push(key)
         url = dest_broker + self.push_api
-        response = requests.post(url, json={'key': key, 'value': value})
+        response = requests.post(url, data={'key': key, 'value': value})
         print(response.text, response.status_code)
         response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
         return response.text
@@ -117,13 +117,13 @@ class Client:
             str: The ID of the registered subscription.
         """
         url = self.coordinator_url + self.reg_subscribe_api
-        response = requests.post(url, json={'ip':f'{self.my_ip}', 'port':f'{self.my_port}'})
+        response = requests.post(url, data={'ip':f'{self.my_ip}', 'port':f'{self.my_port}'})
         if response.status_code == 200:
             json = response.json()
             return json['id']
         else:
             url = self.backup_coordinator_url + self.reg_subscribe_api
-            response = requests.post(url, json={'ip':f'{self.my_ip}', 'port':f'{self.my_port}'})
+            response = requests.post(url, data={'ip':f'{self.my_ip}', 'port':f'{self.my_port}'})
             json = response.json()
             return json['id']
             
@@ -149,7 +149,7 @@ client = Client()
 
 @app.route('/update', methods=['POST'])
 def update():
-    data = request.json
+    data = request.get_json()
     client.update_brokers(data['brokers'])
 
 def pull():
@@ -171,7 +171,7 @@ def subscription_func_wrapper(f):
 
     """
     def f_caller():
-        data = request.json
+        data = request.get_json()
         f(data['key'], data['value']) # convert to byte?
         return 'Awli'
     return f_caller
@@ -180,9 +180,9 @@ def healthcheck(id):
     url1 = client.coordinator_url + client.health_check_api
     url2 = client.backup_coordinator_url + client.health_check_api
     while True:
-        res = requests.post(url1, json={'id':id})    
+        res = requests.post(url1, data={'id':id})    
         if res.status_code != 200:
-            res = requests.post(url2, json={'id':id})
+            res = requests.post(url2, data={'id':id})
         sleep(client.sleep_interval)
 
 def subscribe(f):
