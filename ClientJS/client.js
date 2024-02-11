@@ -99,10 +99,17 @@ function subscriptionFuncWrapper(f) {
 }
 async function registerSubscription(){
     try{
-        url = coordinatorURL + regSubscriptionApi;
-        res = await axios.post(url, {'ip':myIp, 'port':myPort});
-        id = res.data['id'];
-        return id;
+        let url = coordinatorURL + regSubscriptionApi;
+        let res = await axios.post(url, {'ip':myIp, 'port':myPort});
+        if(res.status != 200) {
+          url = backupCoordinatorURL + regSubscriptionApi;
+          res = await axios.post(url, {'ip':myIp, 'port':myPort});
+          id = res.data['id'];
+          return id;
+        } else{
+          id = res.data['id'];
+          return id;
+        }
     } catch(error) {
         console.log(error);
     }

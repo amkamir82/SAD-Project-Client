@@ -109,9 +109,15 @@ class Client:
         """
         url = self.coordinator_url + self.reg_subscribe_api
         response = requests.post(url, json={'ip':f'{self.my_ip}', 'port':f'{self.my_port}'})
-        print(response.text)
-        json = response.json()
-        return json['id']
+        if response.status_code == 200:
+            json = response.json()
+            return json['id']
+        else:
+            url = self.backup_coordinator_url + self.reg_subscribe_api
+            response = requests.post(url, json={'ip':f'{self.my_ip}', 'port':f'{self.my_port}'})
+            json = response.json()
+            return json['id']
+            
  
     def route(self):
         """
