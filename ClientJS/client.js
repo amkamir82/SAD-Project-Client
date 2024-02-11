@@ -9,6 +9,7 @@ app.use(express.json());
 const port = 5001;
 let brokers = []
 let coordinatorURL = 'http://127.0.0.1:5000';
+let backupCoordinatorURL = 'http://127.0.0.1:5000';
 const initApi = '/init'
 const pullApi = '/pull'
 const pushApi = '/write'
@@ -45,10 +46,17 @@ function init(){
     try{
         const url = coordinatorURL + initApi;
         const res = request('GET', url);
+        if (res.status != 200)
+        {
+          const backup = backupCoordinatorURL + initApi
+          const res = request('GET', backupCoordinatorURL);
+          brokers = JSON.parse(res.getBody('utf8'));
+
+        } else{
         // console.log('body:' + res.getBody());
-        brokers = JSON.parse(res.getBody('utf8'));
-        console.log(brokers)
-    } catch(error){
+          brokers = JSON.parse(res.getBody('utf8'));
+        }
+      } catch(error){
         console.error(error)
     }
 }

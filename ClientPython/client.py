@@ -36,6 +36,7 @@ def retry_request(max_retries=5):
 class Client:
     def __init__(self):
         self.coordinator_url = 'http://104.234.196.142:5000'
+        self.backup_coordinator_url = 'http://104.234.196.142:5000'
         self.init_api = '/client/init_client'
         self.pull_api = '/pull'
         self.push_api = '/write'
@@ -46,7 +47,12 @@ class Client:
 
     def init(self):
         self.brokers_lock = threading.Lock()
-        self.brokers = requests.get(self.coordinator_url + self.init_api).json()
+        res = requests.get(self.coordinator_url + self.init_api)
+        if res.status_code == 200:
+            self.brokers = res.json()
+        else: 
+            res = requests.get(self.coordinator_url + self.init_api)
+            self.brokers = res.json()
         print(self.brokers)
     
     @retry_request()
