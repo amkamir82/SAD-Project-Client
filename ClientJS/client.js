@@ -1,6 +1,8 @@
 const  {default: axios} = require('axios');
 const express = require('express');
 const request = require('sync-request')
+const crypto = require('crypto');
+
 
 
 
@@ -18,6 +20,13 @@ const health_check_api = '/client/healthcheck'
 const myIp = '137.0.0.1'
 const myPort = 5001
 const sleepInterval = 3000 
+
+
+function hash_md5(key) {
+  const hash = crypto.createHash('md5');
+  hash.update(key);
+  return hash.digest('hex');
+}
 
 function randomChoice(list) {
     // Check if the list is empty
@@ -80,9 +89,19 @@ async function pull() {
     }
 }
 
+function routeSend(key){
+    const partitionCount = brokers.length
+    for(let i = 0; i < partition_count; i++){
+      hashHex = hash_md5(key)
+      if (parseInt(hashHex, 16) % partitionCount === i)
+        return brokers[i];
+    }
+
+}
+
 async function push(key, value) {
     try{
-        const destBroker = randomChoice(brokers) // http://localhost:6000/
+        const destBroker = routeSend(brokers) //
         const url = destBroker + pushApi
         const res = await axios.post(url, {key, value})
         const data = res.data

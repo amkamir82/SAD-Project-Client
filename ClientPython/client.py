@@ -8,6 +8,7 @@ import os
 from dotenv import load_dotenv
 from time import sleep
 from flask import Flask, request, jsonify
+import hashlib
 
 load_dotenv()
 
@@ -35,6 +36,8 @@ def retry_request(max_retries=5):
     return decorator_retry_request
 
 
+def hash_md5(key: str):
+    return hashlib.md5(key.encode()).hexdigest()
 
 class Client:
     def __init__(self):
@@ -94,7 +97,7 @@ class Client:
         Returns:
             dict: The response from the server in JSON format.
         """
-        dest_broker = self.route()
+        dest_broker = self.route_push(key)
         url = dest_broker + self.push_api
         response = requests.post(url, json={'key': key, 'value': value})
         print(response.text, response.status_code)
@@ -124,7 +127,12 @@ class Client:
             json = response.json()
             return json['id']
             
- 
+    def route_push(self, key):
+        partition_count = len(self.brokers)
+        for i, broker in enumerate(self.brokers):
+            if int(hash_md5(key), 16) % partition_count == i:
+                return broker
+            
     def route(self):
         """
         Selects a random broker from the list of brokers.
