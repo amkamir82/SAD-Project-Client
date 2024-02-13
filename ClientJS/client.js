@@ -1,4 +1,5 @@
 const { default: axios } = require('axios');
+require('dotenv').config()
 const express = require('express');
 const request = require('sync-request')
 const crypto = require('crypto');
@@ -10,18 +11,18 @@ const app = express();
 app.use(express.json());
 const port = 5001;
 let brokers = []
-let coordinatorURL = 'http://137.0.0.1:5000';
-let backupCoordinatorURL = 'http://127.0.0.1:5000';
-const initApi = '/init'
-const pullApi = '/pull'
-const pushApi = '/write'
-const regSubscriptionApi = '/subscribe'
-const health_check_api = '/client/healthcheck'
-const ack_api = '/ack'
-const myIp = '127.0.0.1'
-const myPort = 5001
-const sleepInterval = 3000
-const TIME_OUT = 2000
+let coordinatorURL = process.env.COORDINATOR_URL;
+let backupCoordinatorURL = process.env.BACKUP_COORDINATOR_URL;
+const INIT_API = process.env.INIT_API;
+const PULL_API = process.env.PULL_API;
+const PUSH_API = process.env.PUSH_API;
+const REG_SUBSCRIPTION_API = process.env.REG_SUBSCRIPTION_API;
+const HEALTH_CHECK_API = process.env.HEALTH_CHECK_API;
+const ACK_API = process.env.ACK_API;
+const myIp = '127.0.0.1';
+const myPort = 5001;
+const SLEEP_INTERVAL_SLEEP = process.env.SLEEP_INTERVAL_SLEEP;
+const TIME_OUT = process.env.TIME_OUT;
 
 axios.defaults.timeout = TIME_OUT;
 function hash_md5(key) {
@@ -59,10 +60,10 @@ async function init() {
     console.log(`Client listening on port ${port}`);
   });
   try {
-    const url = coordinatorURL + initApi;
+    const url = coordinatorURL + INIT_API;
     const res = await axios.get(url);
     if (res.status != 200) {
-      const backup = backupCoordinatorURL + initApi
+      const backup = backupCoordinatorURL + INIT_API
       const res = await axios.get(backup);
       brokers = res.data;
 
@@ -72,13 +73,14 @@ async function init() {
     }
   } catch (error) {
     try {
-      const backup = backupCoordinatorURL + initApi
+      const backup = backupCoordinatorURL + INIT_API
       const res = await axios.get(backup);
       brokers = res.data;
     } catch (err) {
       console.error(err)
     }
   }
+  // console.log("brokers: " + brokers)
 }
 
 async function pull() {
@@ -86,7 +88,7 @@ async function pull() {
   let brokers_cp = [...brokers];
   while (true) {
     const destBroker = randomChoice(brokers_cp); // http://localhost:6000/
-    const url = destBroker + pullApi;
+    const url = destBroker + PULL_API;
     console.log("dest broker:" + destBroker);
     let data;
     try {
@@ -100,7 +102,7 @@ async function pull() {
       }
       data = res.data;
     
-    axios.post(destBroker + ack_api)
+    axios.post(destBroker + ACK_API)
     return [data['key'], data['value']]
   } catch (error) {
     brokers_cp = brokers_cp.filter((item) => item !== destBroker);
@@ -128,7 +130,7 @@ async function push(key, value) {
   try {
     const destBroker = routeSend(key) //
     console.log('push dest:', destBroker)
-    const url = destBroker + pushApi
+    const url = destBroker + PUSH_API
     const res = await axios.post(url, { key, value })
     const data = res.data
     return data
@@ -151,10 +153,10 @@ function subscriptionFuncWrapper(f) {
 }
 async function registerSubscription() {
   try {
-    let url = coordinatorURL + regSubscriptionApi;
+    let url = coordinatorURL + REG_SUBSCRIPTION_API;
     let res = await axios.post(url, { 'ip': myIp, 'port': myPort });
     if (res.status != 200) {
-      url = backupCoordinatorURL + regSubscriptionApi;
+      url = backupCoordinatorURL + REG_SUBSCRIPTION_API;
       res = await axios.post(url, { 'ip': myIp, 'port': myPort });
       id = res.data['id'];
       return id;
@@ -163,7 +165,7 @@ async function registerSubscription() {
       return id;
     }
   } catch (error) {
-    url = backupCoordinatorURL + regSubscriptionApi;
+    url = backupCoordinatorURL + REG_SUBSCRIPTION_API;
     res = await axios.post(url, { 'ip': myIp, 'port': myPort });
     id = res.data['id'];
     return id;
@@ -171,8 +173,8 @@ async function registerSubscription() {
 }
 
 function healthcheck(id) {
-  url1 = coordinatorURL + health_check_api
-  url2 = backupCoordinatorURL + health_check_api
+  url1 = coordinatorURL + HEALTH_CHECK_API
+  url2 = backupCoordinatorURL + HEALTH_CHECK_API
   res = axios.post(url1, { 'id': id }).then((res) => {
     if (res.status_code != 200) {
       axios.post(url2, { 'id': id })
@@ -185,7 +187,7 @@ async function subscribe(f) {
   const id = await registerSubscription();
   const route = `/subscribe-${id}`
   app.post(route, subscriptionFuncWrapper(f));
-  setInterval(healthcheck, sleepInterval)
+  setInterval(healthcheck, SLEEP_INTERVAL_SLEEP)
 
 }
 
