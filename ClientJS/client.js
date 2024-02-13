@@ -45,10 +45,12 @@ function randomChoice(brokersObj) {
   return brokersObj[lst[randomIndex]];
 }
 
-
-app.post('/update', async (req, res) => {
+function updateBrokers(update){
+  brokers = update
+}
+app.post('/update-brokers', async (req, res) => {
   try {
-    client.updateBrokers(req.body.brokers);
+    updateBrokers(req.body.brokers);
     res.status(200).send('Brokers updated');
   } catch (error) {
     console.error('Error updating brokers:', error);

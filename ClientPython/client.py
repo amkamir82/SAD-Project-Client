@@ -136,9 +136,9 @@ class Client:
     
     def update_brokers(self, brokers):
         with self.brokers_lock:
-            print()
+            print(self.brokers)
             self.brokers = brokers
-
+            print('updated brokers:', self.brokers)
     def send_register_request(self, url):
         try:
             response = requests.post(url, data=jsonlib.dumps({'ip':f'{self.my_ip}', 'port':f'{self.my_port}'}))
@@ -191,7 +191,7 @@ app = Flask(__name__)
 client = Client()
 
 
-@app.route('/update', methods=['POST'])
+@app.route('/update-brokers', methods=['POST'])
 def update():
     data = request.get_json()
     client.update_brokers(data['brokers'])
