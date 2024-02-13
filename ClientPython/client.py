@@ -136,6 +136,7 @@ class Client:
     
     def update_brokers(self, brokers):
         with self.brokers_lock:
+            print()
             self.brokers = brokers
 
     def send_register_request(self, url):

@@ -178,8 +178,9 @@ function healthcheck(id) {
     url1 = coordinatorURL + HEALTH_CHECK_API
     url2 = backupCoordinatorURL + HEALTH_CHECK_API
     res = axios.post(url1, { 'ip': myIp, 'port': myPort }).then((res) => {
-      if (res.status_code != 200) {
-        axios.post(url2, { 'id': id })
+      if (res.status != 200) {
+        console.log('bad health check')
+        axios.post(url2, { 'ip': myIp, 'port': myPort })
       }
     }).catch((err) => {
       axios.post(url2, { 'ip': myIp, 'port': myPort })
