@@ -195,7 +195,7 @@ client = Client()
 def update():
     data = jsonlib.loads(request.data.decode('utf-8'))
     client.update_brokers(data['brokers'])
-
+    return jsonify('Updated'), 200
 def pull():
     return client.pull()
 
