@@ -193,7 +193,7 @@ client = Client()
 
 @app.route('/update-brokers', methods=['POST'])
 def update():
-    data = request.get_json()
+    data = jsonlib.loads(request.data.decode('utf-8'))
     client.update_brokers(data['brokers'])
 
 def pull():
