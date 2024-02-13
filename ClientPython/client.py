@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from time import sleep
 from flask import Flask, request, jsonify
 import hashlib
+import json as jsonlib
 
 load_dotenv()
 
@@ -51,15 +52,16 @@ class Client:
         self.my_port = os.getenv('MY_PORT')
         self.my_ip = os.getenv('MY_IP')
         self.health_check_api = os.getenv('HEALTH_CHECK_API')
-        self.sleep_interval = os.getenv('SLEEP_INTERVAL')
+        self.sleep_interval = int(os.getenv('SLEEP_INTERVAL'))
         
         self.init()
 
     def send_init_request(self, url):
         try:
-            response = requests.get(url)
+            response = requests.post(url, data=jsonlib.dumps({'ip':self.my_ip, 'port':self.my_port}))
             if response.status_code == 200:
                 brokers = response.json()
+                print(brokers)
                 return brokers
         except:
             return None
@@ -138,12 +140,16 @@ class Client:
 
     def send_register_request(self, url):
         try:
-            response = requests.post(url, data={'ip':f'{self.my_ip}', 'port':f'{self.my_port}'})
+            response = requests.post(url, data=jsonlib.dumps({'ip':f'{self.my_ip}', 'port':f'{self.my_port}'}))
+            print(response)
             if response.status_code == 200:
                 json = response.json()
+                print(json)
                 return json['id']
-        except:
-            return None
+        except Exception as e:
+            print(e)
+            
+        return None
         
             
     def register_subscription(self):
@@ -157,16 +163,17 @@ class Client:
             _ + self.reg_subscribe_api for _ in [self.coordinator_url, self.backup_coordinator_url]
         ]
         for url in urls:
+            print(url)
             broker_id = self.send_register_request(url)
             if broker_id is not None:
                 return broker_id
 
             
     def route_push(self, key):
-        partition_count = len(self.brokers)
-        for i, broker in enumerate(self.brokers):
-            if int(hash_md5(key), 16) % partition_count == i:
-                return broker
+        partition_count = len(self.brokers.keys())
+        for item in self.brokers.keys():
+            if int(hash_md5(key), 16) % partition_count == int(item):
+                return self.brokers[item]
             
     def route(self, brokers):
         """
@@ -176,7 +183,8 @@ class Client:
             str: The selected broker.
         """
         with self.brokers_lock:
-            return random.choice(brokers)
+            key = random.choice(brokers.keys())
+            return brokers[key]
 
 app = Flask(__name__)
 client = Client()
@@ -211,15 +219,18 @@ def subscription_func_wrapper(f):
         return 'Awli'
     return f_caller
 
-def healthcheck(id):
+def healthcheck():
     url1 = client.coordinator_url + client.health_check_api
     url2 = client.backup_coordinator_url + client.health_check_api
     while True:
-        res = requests.post(url1, data={'id':id})    
-        if res.status_code != 200:
-            res = requests.post(url2, data={'id':id})
+        try:
+            res = requests.post(url1, data=jsonlib.dumps({'ip':client.my_ip, 'port':client.my_port}))    
+            if res.status_code != 200:
+                res = requests.post(url2, data=jsonlib.dumps({'ip':client.my_ip, 'port':client.my_port}))
+        except:
+            pass
         sleep(client.sleep_interval)
-
+        
 def subscribe(f):
     """
     Subscribes a function to a route and registers a subscription.
@@ -233,10 +244,9 @@ def subscribe(f):
     sub_id = client.register_subscription()
     if sub_id == None:
         return 'Failed'
-    app.route('/subscribe-' + sub_id, methods=['POST'])(subscription_func_wrapper(f))
+    app.route('/subscribe-' + str(sub_id), methods=['POST'])(subscription_func_wrapper(f))
     threading.Thread(
         target=healthcheck,
-        args=(sub_id,),
         daemon=True
     ).start()
     

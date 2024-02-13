@@ -10,8 +10,8 @@ def main():
     # push('arshia', 'akhavan2')
     # push('arshia', 'akhavan3')
     
-    print(pull())
-
+    # print(pull())
+    subscribe(print)
     input()
 
 

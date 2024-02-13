@@ -21,7 +21,7 @@ const HEALTH_CHECK_API = process.env.HEALTH_CHECK_API;
 const ACK_API = process.env.ACK_API;
 const myIp = '127.0.0.1';
 const myPort = 5001;
-const SLEEP_INTERVAL_SLEEP = process.env.SLEEP_INTERVAL_SLEEP;
+const SLEEP_INTERVAL_SLEEP = parseInt(process.env.SLEEP_INTERVAL_SLEEP);
 const TIME_OUT = process.env.TIME_OUT;
 
 axios.defaults.timeout = TIME_OUT;
@@ -31,17 +31,18 @@ function hash_md5(key) {
   return hash.digest('hex');
 }
 
-function randomChoice(list) {
+function randomChoice(brokersObj) {
+  let lst = Object.keys(brokersObj)
   // Check if the list is empty
-  if (list.length === 0) {
+  if (lst.length === 0) {
     return null;
   }
 
   // Generate a random index within the range of the list length
-  const randomIndex = Math.floor(Math.random() * list.length);
+  const randomIndex = Math.floor(Math.random() * lst.length);
 
   // Return the member at the random index
-  return list[randomIndex];
+  return brokersObj[lst[randomIndex]];
 }
 
 
@@ -61,10 +62,10 @@ async function init() {
   });
   try {
     const url = coordinatorURL + INIT_API;
-    const res = await axios.get(url);
+    const res = await axios.post(url, { 'ip': myIp, 'port': myPort });
     if (res.status != 200) {
       const backup = backupCoordinatorURL + INIT_API
-      const res = await axios.get(backup);
+      const res = await axios.post(backup, { 'ip': myIp, 'port': myPort });
       brokers = res.data;
 
     } else {
@@ -74,18 +75,18 @@ async function init() {
   } catch (error) {
     try {
       const backup = backupCoordinatorURL + INIT_API
-      const res = await axios.get(backup);
+      const res = await axios.post(backup, { 'ip': myIp, 'port': myPort });
       brokers = res.data;
     } catch (err) {
       console.error(err)
     }
   }
-  // console.log("brokers: " + brokers)
+
 }
 
 async function pull() {
 
-  let brokers_cp = [...brokers];
+  let brokers_cp = JSON.parse(brokers)
   while (true) {
     const destBroker = randomChoice(brokers_cp); // http://localhost:6000/
     const url = destBroker + PULL_API;
@@ -95,29 +96,29 @@ async function pull() {
       const res = await axios.get(url)
       if (res.status_code != 200) {
         brokers_cp = brokers_cp.filter((item) => item !== destBroker);
-        if(brokers_cp.length > 0)
+        if (brokers_cp.length > 0)
           continue;
-        else 
+        else
           return;
       }
       data = res.data;
-    
-    axios.post(destBroker + ACK_API)
-    return [data['key'], data['value']]
-  } catch (error) {
-    brokers_cp = brokers_cp.filter((item) => item !== destBroker);
-        if(brokers_cp.length > 0)
-          continue;
-        else 
-          return;
+
+      axios.post(destBroker + ACK_API)
+      return [data['key'], data['value']]
+    } catch (error) {
+      brokers_cp = brokers_cp.filter((item) => item !== destBroker);
+      if (brokers_cp.length > 0)
+        continue;
+      else
+        return;
+    }
+
   }
-  
-}
 
 }
 
 function routeSend(key) {
-  const partitionCount = brokers.length
+  const partitionCount = Object.keys(brokers).length
   for (let i = 0; i < partitionCount; i++) {
     hashHex = hash_md5(key)
     if (parseInt(hashHex, 16) % partitionCount === i)
@@ -173,15 +174,19 @@ async function registerSubscription() {
 }
 
 function healthcheck(id) {
-  url1 = coordinatorURL + HEALTH_CHECK_API
-  url2 = backupCoordinatorURL + HEALTH_CHECK_API
-  res = axios.post(url1, { 'id': id }).then((res) => {
-    if (res.status_code != 200) {
-      axios.post(url2, { 'id': id })
-    }
-  }).catch((err) => {
-    axios.post(url2, { 'id': id })
-  })
+  try {
+    url1 = coordinatorURL + HEALTH_CHECK_API
+    url2 = backupCoordinatorURL + HEALTH_CHECK_API
+    res = axios.post(url1, { 'ip': myIp, 'port': myPort }).then((res) => {
+      if (res.status_code != 200) {
+        axios.post(url2, { 'id': id })
+      }
+    }).catch((err) => {
+      axios.post(url2, { 'ip': myIp, 'port': myPort })
+    })
+  } catch (e) {
+
+  }
 }
 async function subscribe(f) {
   const id = await registerSubscription();
