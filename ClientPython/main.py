@@ -6,7 +6,12 @@ def main():
     # print(key, val)
     # push('arshia', 'akhavan')
     # subscribe(print)
+    # push('arshia', 'akhavan1')
+    # push('arshia', 'akhavan2')
+    # push('arshia', 'akhavan3')
     
+    print(pull())
+
     input()
 
 

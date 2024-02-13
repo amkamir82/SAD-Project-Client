@@ -1,4 +1,4 @@
-const  {default: axios} = require('axios');
+const { default: axios } = require('axios');
 const express = require('express');
 const request = require('sync-request')
 const crypto = require('crypto');
@@ -12,16 +12,18 @@ const port = 5001;
 let brokers = []
 let coordinatorURL = 'http://137.0.0.1:5000';
 let backupCoordinatorURL = 'http://127.0.0.1:5000';
-const initApi = '/client/init'
+const initApi = '/init'
 const pullApi = '/pull'
 const pushApi = '/write'
 const regSubscriptionApi = '/subscribe'
 const health_check_api = '/client/healthcheck'
-const myIp = '137.0.0.1'
+const ack_api = '/ack'
+const myIp = '127.0.0.1'
 const myPort = 5001
-const sleepInterval = 3000 
+const sleepInterval = 3000
+const TIME_OUT = 2000
 
-
+axios.defaults.timeout = TIME_OUT;
 function hash_md5(key) {
   const hash = crypto.createHash('md5');
   hash.update(key);
@@ -29,21 +31,21 @@ function hash_md5(key) {
 }
 
 function randomChoice(list) {
-    // Check if the list is empty
-    if (list.length === 0) {
-      return null;
-    }
-    
-    // Generate a random index within the range of the list length
-    const randomIndex = Math.floor(Math.random() * list.length);
-    
-    // Return the member at the random index
-    return list[randomIndex];
+  // Check if the list is empty
+  if (list.length === 0) {
+    return null;
+  }
+
+  // Generate a random index within the range of the list length
+  const randomIndex = Math.floor(Math.random() * list.length);
+
+  // Return the member at the random index
+  return list[randomIndex];
 }
 
 
 app.post('/update', async (req, res) => {
-  try { 
+  try {
     client.updateBrokers(req.body.brokers);
     res.status(200).send('Brokers updated');
   } catch (error) {
@@ -52,63 +54,87 @@ app.post('/update', async (req, res) => {
   }
 });
 
-function init(){
-    try{
-        const url = coordinatorURL + initApi;
-        const res = request('GET', url, {timeout: true});
-        if (res.status != 200)
-        {
-          const backup = backupCoordinatorURL + initApi
-          const res = request('GET', backup);
-          brokers = JSON.parse(res.getBody('utf8'));
+async function init() {
+  app.listen(port, () => {
+    console.log(`Client listening on port ${port}`);
+  });
+  try {
+    const url = coordinatorURL + initApi;
+    const res = await axios.get(url);
+    if (res.status != 200) {
+      const backup = backupCoordinatorURL + initApi
+      const res = await axios.get(backup);
+      brokers = res.data;
 
-        } else{
-        // console.log('body:' + res.getBody());
-          brokers = JSON.parse(res.getBody('utf8'));
-        }
-      } catch(error){
-        try{
-          const backup = backupCoordinatorURL + initApi
-          const res = request('GET', backup);
-          brokers = JSON.parse(res.getBody('utf8'));
-        } catch(err){
-          console.error(err)
-        }
-      }
+    } else {
+      // console.log('body:' + res.getBody());
+      brokers = res.data;
+    }
+  } catch (error) {
+    try {
+      const backup = backupCoordinatorURL + initApi
+      const res = await axios.get(backup);
+      brokers = res.data;
+    } catch (err) {
+      console.error(err)
+    }
+  }
 }
 
 async function pull() {
-    try{
-        const destBroker = randomChoice(brokers) // http://localhost:6000/
-        const url = destBroker + pullApi
-        const res = await axios.get(url)
-        const data = res.data
-        return [data['key'], data['value']]
-    } catch (error){
-        console.error(error)
-    }
+
+  let brokers_cp = [...brokers];
+  while (true) {
+    const destBroker = randomChoice(brokers_cp); // http://localhost:6000/
+    const url = destBroker + pullApi;
+    console.log("dest broker:" + destBroker);
+    let data;
+    try {
+      const res = await axios.get(url)
+      if (res.status_code != 200) {
+        brokers_cp = brokers_cp.filter((item) => item !== destBroker);
+        if(brokers_cp.length > 0)
+          continue;
+        else 
+          return;
+      }
+      data = res.data;
+    
+    axios.post(destBroker + ack_api)
+    return [data['key'], data['value']]
+  } catch (error) {
+    brokers_cp = brokers_cp.filter((item) => item !== destBroker);
+        if(brokers_cp.length > 0)
+          continue;
+        else 
+          return;
+  }
+  
 }
 
-function routeSend(key){
-    const partitionCount = brokers.length
-    for(let i = 0; i < partition_count; i++){
-      hashHex = hash_md5(key)
-      if (parseInt(hashHex, 16) % partitionCount === i)
-        return brokers[i];
-    }
+}
+
+function routeSend(key) {
+  const partitionCount = brokers.length
+  for (let i = 0; i < partitionCount; i++) {
+    hashHex = hash_md5(key)
+    if (parseInt(hashHex, 16) % partitionCount === i)
+      return brokers[i];
+  }
 
 }
 
 async function push(key, value) {
-    try{
-        const destBroker = routeSend(brokers) //
-        const url = destBroker + pushApi
-        const res = await axios.post(url, {key, value})
-        const data = res.data
-        return data
-    } catch (error){
-        console.error(error)
-    }
+  try {
+    const destBroker = routeSend(key) //
+    console.log('push dest:', destBroker)
+    const url = destBroker + pushApi
+    const res = await axios.post(url, { key, value })
+    const data = res.data
+    return data
+  } catch (error) {
+    console.error(error)
+  }
 }
 
 function subscriptionFuncWrapper(f) {
@@ -123,50 +149,49 @@ function subscriptionFuncWrapper(f) {
     }
   };
 }
-async function registerSubscription(){
-    try{
-        let url = coordinatorURL + regSubscriptionApi;
-        let res = await axios.post(url, {'ip':myIp, 'port':myPort});
-        if(res.status != 200) {
-          url = backupCoordinatorURL + regSubscriptionApi;
-          res = await axios.post(url, {'ip':myIp, 'port':myPort});
-          id = res.data['id'];
-          return id;
-        } else{
-          id = res.data['id'];
-          return id;
-        }
-    } catch(error) {
-        console.log(error);
+async function registerSubscription() {
+  try {
+    let url = coordinatorURL + regSubscriptionApi;
+    let res = await axios.post(url, { 'ip': myIp, 'port': myPort });
+    if (res.status != 200) {
+      url = backupCoordinatorURL + regSubscriptionApi;
+      res = await axios.post(url, { 'ip': myIp, 'port': myPort });
+      id = res.data['id'];
+      return id;
+    } else {
+      id = res.data['id'];
+      return id;
     }
+  } catch (error) {
+    url = backupCoordinatorURL + regSubscriptionApi;
+    res = await axios.post(url, { 'ip': myIp, 'port': myPort });
+    id = res.data['id'];
+    return id;
+  }
 }
 
-function healthcheck(id){
-    url1 = client.coordinator_url + health_check_api
-    url2 = client.backup_coordinator_url + health_check_api
-    res = axios.post(url1, {'id':id}).then((res) => {
-      if (res.status_code != 200){
-          axios.post(url2, {'id':id})
-      }
-    }).catch((err) => {
-      axios.post(url2, {'id':id})
-    })
+function healthcheck(id) {
+  url1 = coordinatorURL + health_check_api
+  url2 = backupCoordinatorURL + health_check_api
+  res = axios.post(url1, { 'id': id }).then((res) => {
+    if (res.status_code != 200) {
+      axios.post(url2, { 'id': id })
+    }
+  }).catch((err) => {
+    axios.post(url2, { 'id': id })
+  })
 }
 async function subscribe(f) {
-    const id = await registerSubscription();
-    const route = `/subscribe-${id}`
-    app.post(route, subscriptionFuncWrapper(f));
-    setInterval(healthcheck, sleepInterval)
+  const id = await registerSubscription();
+  const route = `/subscribe-${id}`
+  app.post(route, subscriptionFuncWrapper(f));
+  setInterval(healthcheck, sleepInterval)
 
 }
 
-init();
-app.listen(port, () => {
-  //  console.log(`Client listening on port ${port}`);
-});
-
 module.exports = {
-    pull,
-    push,
-    subscribe
+  init,
+  pull,
+  push,
+  subscribe
 }

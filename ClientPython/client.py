@@ -46,24 +46,47 @@ class Client:
         self.init_api = os.getenv('INIT_API')
         self.pull_api = os.getenv('PULL_API')
         self.push_api = os.getenv('PUSH_API')
+        self.ack_api = os.getenv('ACK_API')
         self.reg_subscribe_api = os.getenv('REG_SUBSCRIBE_API')
         self.my_port = os.getenv('MY_PORT')
         self.my_ip = os.getenv('MY_IP')
         self.health_check_api = os.getenv('HEALTH_CHECK_API')
         self.sleep_interval = os.getenv('SLEEP_INTERVAL')
+        
         self.init()
 
+    def send_init_request(self, url):
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                brokers = response.json()
+                return brokers
+        except:
+            return None
+    
     def init(self):
         self.brokers_lock = threading.Lock()
-        res = requests.get(self.coordinator_url + self.init_api)
-        if res.status_code == 200:
-            self.brokers = res.json()
-        else: 
-            res = requests.get(self.coordinator_url + self.init_api)
-            self.brokers = res.json()
-        print(self.brokers)
-    
+        urls = [
+            _ + self.init_api for _ in [self.coordinator_url, self.backup_coordinator_url]
+        ]
+        for url in urls:
+            brokers = self.send_init_request(url)
+            if brokers != None:
+                self.brokers = brokers
+                break
+
+
     @retry_request()
+    def inner_pull(self, dest_broker):
+        url = dest_broker + self.pull_api
+        response = requests.get(url)
+        if 400 <= response.status_code < 500:
+            return None
+        response.raise_for_status()
+        json = response.json()
+        return json['key'], json['value']   # Return the response content if request is successful
+            
+    
     def pull(self):
         """
         Pulls data from the server using the specified API endpoint.
@@ -74,15 +97,19 @@ class Client:
         Raises:
             requests.HTTPError: If the response status code is 4xx or 5xx.
         """
-        dest_broker = self.route()
-        url = dest_broker + self.pull_api
-        response = requests.get(url)
-        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
-        json = response.json()
-        
-        
-        return json['key'], json['value']   # Return the response content if request is successful
-                                                # Todo convert to byte?
+        brokers = self.brokers[::] 
+        while True:
+            print('brokers: ', brokers)
+            dest_broker = self.route(brokers)
+            print('dest_broker: ', dest_broker)
+            result = self.inner_pull(dest_broker=dest_broker)
+            if result is not None:
+                url = dest_broker + self.ack_api
+                requests.post(url)                
+                return result
+            brokers.remove(dest_broker)
+            
+
             
             
     @retry_request()    
@@ -109,6 +136,16 @@ class Client:
         with self.brokers_lock:
             self.brokers = brokers
 
+    def send_register_request(self, url):
+        try:
+            response = requests.post(url, data={'ip':f'{self.my_ip}', 'port':f'{self.my_port}'})
+            if response.status_code == 200:
+                json = response.json()
+                return json['id']
+        except:
+            return None
+        
+            
     def register_subscription(self):
         """
         Sends a POST request to the coordinator URL to register a subscription.
@@ -116,16 +153,14 @@ class Client:
         Returns:
             str: The ID of the registered subscription.
         """
-        url = self.coordinator_url + self.reg_subscribe_api
-        response = requests.post(url, data={'ip':f'{self.my_ip}', 'port':f'{self.my_port}'})
-        if response.status_code == 200:
-            json = response.json()
-            return json['id']
-        else:
-            url = self.backup_coordinator_url + self.reg_subscribe_api
-            response = requests.post(url, data={'ip':f'{self.my_ip}', 'port':f'{self.my_port}'})
-            json = response.json()
-            return json['id']
+        urls = [
+            _ + self.reg_subscribe_api for _ in [self.coordinator_url, self.backup_coordinator_url]
+        ]
+        for url in urls:
+            broker_id = self.send_register_request(url)
+            if broker_id is not None:
+                return broker_id
+
             
     def route_push(self, key):
         partition_count = len(self.brokers)
@@ -133,7 +168,7 @@ class Client:
             if int(hash_md5(key), 16) % partition_count == i:
                 return broker
             
-    def route(self):
+    def route(self, brokers):
         """
         Selects a random broker from the list of brokers.
 
@@ -141,7 +176,7 @@ class Client:
             str: The selected broker.
         """
         with self.brokers_lock:
-            return random.choice(self.brokers)
+            return random.choice(brokers)
 
 app = Flask(__name__)
 client = Client()
@@ -196,6 +231,8 @@ def subscribe(f):
         None
     """
     sub_id = client.register_subscription()
+    if sub_id == None:
+        return 'Failed'
     app.route('/subscribe-' + sub_id, methods=['POST'])(subscription_func_wrapper(f))
     threading.Thread(
         target=healthcheck,
