@@ -22,6 +22,36 @@ def main():
     print(pull())
     input('check kon okay bashe')
 
+    
+    KEY_RANGE = 100
+    KEYS = 10
+    push_seq = { _ : [] for _ in range(KEYS)}
+    for i in range(KEY_RANGE):
+        print(f"pushing {i} with key {i%KEYS}")
+        push(f"{i%KEYS}", i)
+        push_seq[i].append(i)
 
+    pull_seq = { _ : [] for _ in range(KEYS)}
+    for i in range(KEY_RANGE):
+        key, val = pull()
+        pull_seq[key].append(val)
+        
+    print(f'push_seq', push_seq)
+    print(f'pull_seq', pull_seq)
+    input('is it ok?')
+    
+    
+    KEY_RANGE = 100
+    KEYS = 10
+    for i in range(KEY_RANGE):
+        subscribe(print)
+    push_seq = { _ : [] for _ in range(KEYS)}
+    for i in range(KEY_RANGE):
+        print(f"pushing {i} with key {i%KEYS}")
+        push(f"{i%KEYS}", i)
+        push_seq[i].append(i)
+    
+    print('is subscribe working?')
+    
 if __name__ == "__main__":
     main()
