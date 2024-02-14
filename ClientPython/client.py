@@ -58,7 +58,7 @@ class Client:
 
     def send_init_request(self, url):
         try:
-            response = requests.post(url, data=jsonlib.dumps({'ip':self.my_ip, 'port':self.my_port}))
+            response = requests.post(url, data=jsonlib.dumps({'ip':self.my_ip, 'port':self.my_port}), timeout=3)
             if response.status_code == 200:
                 brokers = response.json()
                 print(f"response: {brokers}")
@@ -81,7 +81,7 @@ class Client:
     @retry_request()
     def inner_pull(self, dest_broker):
         url = dest_broker + self.pull_api
-        response = requests.get(url)
+        response = requests.get(url, timeout=3)
         if 400 <= response.status_code < 500:
             return None
         response.raise_for_status()
@@ -131,7 +131,7 @@ class Client:
         dest_broker = self.route_push(key)
         url = dest_broker + self.push_api
         print(f"dest_broker: {url}")
-        response = requests.post(url, data=jsonlib.dumps({'key': key, 'value': str(value)}), headers={"Content-Type": "application/json"})
+        response = requests.post(url, data=jsonlib.dumps({'key': key, 'value': str(value)}), headers={"Content-Type": "application/json"}, timeout=3)
         print("reponse: ",response.text, response.status_code)
         response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
         return response.text
@@ -144,7 +144,7 @@ class Client:
             print('updated brokers:', self.brokers)
     def send_register_request(self, url):
         try:
-            response = requests.post(url, data=jsonlib.dumps({'ip':f'{self.my_ip}', 'port':f'{self.my_port}'}))
+            response = requests.post(url, data=jsonlib.dumps({'ip':f'{self.my_ip}', 'port':f'{self.my_port}'}), timeout=3)
             print(response)
             if response.status_code == 200:
                 json = response.json()
