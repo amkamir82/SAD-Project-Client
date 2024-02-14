@@ -130,7 +130,7 @@ class Client:
         dest_broker = self.route_push(key)
         url = dest_broker + self.push_api
         print(f"dest_broker: {url}")
-        response = requests.post(url, data=jsonlib.dumps({'key': key, 'value': str(value)}), headers={"Content-Type": "application/json"}, timeout=20)
+        response = requests.post(url, data=jsonlib.dumps({'key': key, 'value': str(value)}), headers={"Content-Type": "application/json"})
         print("reponse: ",response.text, response.status_code)
         response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
         return response.text
