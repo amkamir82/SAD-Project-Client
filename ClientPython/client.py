@@ -104,14 +104,14 @@ class Client:
         brokers = dict(self.brokers)
         while True:
             print('brokers: ', brokers)
-            dest_broker = self.route(brokers)
+            key, dest_broker = self.route(brokers)
             print('dest_broker: ', dest_broker)
             result = self.inner_pull(dest_broker=dest_broker)
             if result is not None:
                 url = dest_broker + self.ack_api
                 requests.post(url)                
                 return result
-            brokers.remove(dest_broker)
+            brokers.pop(key)
             
 
             
@@ -192,7 +192,7 @@ class Client:
         """
         with self.brokers_lock:
             key = random.choice(list(brokers.keys()))
-            return brokers[key]
+            return key, brokers[key]
 
 app = Flask(__name__)
 client = Client()
