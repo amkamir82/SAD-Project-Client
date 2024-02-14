@@ -178,8 +178,9 @@ class Client:
             partition_count = len(self.brokers.keys())
             print('partition count', partition_count)
             for item in self.brokers.keys():
+                md5 = hash_md5(key)
                 if int(hash_md5(key), 16) % partition_count == int(item) - 1:
-                    print('id of dest broker', item)
+                    print('id of dest broker', item, 'hash_md5', md5)
                     return self.brokers[item]
             
     def route(self, brokers):
