@@ -3,13 +3,16 @@ require('dotenv').config()
 const express = require('express');
 const request = require('sync-request')
 const crypto = require('crypto');
+const { log } = require('console');
 
 
 
 
 const app = express();
+
 app.use(express.json());
-const port = 5001;
+
+const port = 5005;
 let brokers = []
 let coordinatorURL = process.env.COORDINATOR_URL;
 let backupCoordinatorURL = process.env.BACKUP_COORDINATOR_URL;
@@ -20,7 +23,7 @@ const REG_SUBSCRIPTION_API = process.env.REG_SUBSCRIPTION_API;
 const HEALTH_CHECK_API = process.env.HEALTH_CHECK_API;
 const ACK_API = process.env.ACK_API;
 const myIp = '127.0.0.1';
-const myPort = 5001;
+const myPort = port;
 const SLEEP_INTERVAL_SLEEP = parseInt(process.env.SLEEP_INTERVAL_SLEEP);
 const TIME_OUT = process.env.TIME_OUT;
 
@@ -48,20 +51,34 @@ function randomChoice(brokersObj) {
 function updateBrokers(update){
   brokers = update
 }
-app.post('/update-brokers', async (req, res) => {
+app.route('/update-brokers').post((req, res) => {
+  console.log('recieve update')
   try {
+    console.log(req)
     updateBrokers(req.body.brokers);
-    res.status(200).send('Brokers updated');
+    console.log("body " + req.body)
+    console.log(Object.keys(req.body))
+    res.status(200)
+    res.send('Brokers updated');
+    res.end()
   } catch (error) {
     console.error('Error updating brokers:', error);
     res.status(500).send('Error updating brokers');
+    res.end()
   }
+  console.log('here')
+  console.log()
+  for(item in brokers)
+    console.log(item)
+  console.log('rid')
+});
+
+
+app.listen(port, () => {
+  console.log(`Client listening on port ${port}`);
 });
 
 async function init() {
-  app.listen(port, () => {
-    console.log(`Client listening on port ${port}`);
-  });
   try {
     const url = coordinatorURL + INIT_API;
     const res = await axios.post(url, { 'ip': myIp, 'port': myPort });
@@ -74,7 +91,9 @@ async function init() {
       // console.log('body:' + res.getBody());
       brokers = res.data;
     }
+    console.log('fuck')
   } catch (error) {
+    console.log(error)
     try {
       const backup = backupCoordinatorURL + INIT_API
       const res = await axios.post(backup, { 'ip': myIp, 'port': myPort });
@@ -120,11 +139,12 @@ async function pull() {
 }
 
 function routeSend(key) {
-  const partitionCount = Object.keys(brokers).length
+  const keys = Object.keys(brokers)
+  const partitionCount = keys.length
   for (let i = 0; i < partitionCount; i++) {
     hashHex = hash_md5(key)
-    if (parseInt(hashHex, 16) % partitionCount === i)
-      return brokers[i];
+    if (parseInt(hashHex, 16) % partitionCount === parsInt(keys[i])))
+      return brokers[keys[i]];
   }
 
 }

@@ -61,7 +61,7 @@ class Client:
             response = requests.post(url, data=jsonlib.dumps({'ip':self.my_ip, 'port':self.my_port}))
             if response.status_code == 200:
                 brokers = response.json()
-                print(brokers)
+                print(f"response: {brokers}")
                 return brokers
         except:
             return None
@@ -99,7 +99,7 @@ class Client:
         Raises:
             requests.HTTPError: If the response status code is 4xx or 5xx.
         """
-        brokers = self.brokers[::] 
+        brokers = dict(self.brokers)
         while True:
             print('brokers: ', brokers)
             dest_broker = self.route(brokers)
@@ -128,8 +128,9 @@ class Client:
         """
         dest_broker = self.route_push(key)
         url = dest_broker + self.push_api
-        response = requests.post(url, data={'key': key, 'value': value})
-        print(response.text, response.status_code)
+        print(f"dest_broker: {url}")
+        response = requests.post(url, data=jsonlib.dumps({'key': key, 'value': value}), headers={"Content-Type": "application/json"})
+        print("reponse: ",response.text, response.status_code)
         response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
         return response.text
     
@@ -171,10 +172,13 @@ class Client:
 
             
     def route_push(self, key):
-        partition_count = len(self.brokers.keys())
-        for item in self.brokers.keys():
-            if int(hash_md5(key), 16) % partition_count == int(item):
-                return self.brokers[item]
+        with self.brokers_lock:
+            partition_count = len(self.brokers.keys())
+            print('partition count', partition_count)
+            for item in self.brokers.keys():
+                if int(hash_md5(key), 16) % partition_count == int(item) - 1:
+                    print('id of dest broker', item)
+                    return self.brokers[item]
             
     def route(self, brokers):
         """
@@ -184,7 +188,7 @@ class Client:
             str: The selected broker.
         """
         with self.brokers_lock:
-            key = random.choice(brokers.keys())
+            key = random.choice(list(brokers.keys()))
             return brokers[key]
 
 app = Flask(__name__)
