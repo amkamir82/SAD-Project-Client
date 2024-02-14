@@ -104,6 +104,9 @@ class Client:
         brokers = dict(self.brokers)
         while True:
             key, dest_broker = self.route(brokers)
+            if key == None:
+                print("[-] Couldn't pull " )
+                return
             result = self.inner_pull(dest_broker=dest_broker)
             if result is not None:
                 url = dest_broker + self.ack_api
@@ -188,6 +191,8 @@ class Client:
         Returns:
             str: The selected broker.
         """
+        if len(brokers.keys()) == 0:
+            return None, None
         with self.brokers_lock:
             key = random.choice(list(brokers.keys()))
             return key, brokers[key]
@@ -201,6 +206,7 @@ def update():
     data = jsonlib.loads(request.data.decode('utf-8'))
     client.update_brokers(data['brokers'])
     return jsonify('Updated'), 200
+
 def pull():
     return client.pull()
 

@@ -13,13 +13,9 @@ def main():
     push('arshia5', 'akhavan5')
     print('[+] sending arshia6')
     push('arshia6', 'akhavan6')
+    for i in range(6):
+        print(pull())
 
-    print(pull())
-    print(pull())
-    print(pull())
-    print(pull())
-    print(pull())
-    print(pull())
     input('check kon okay bashe')
 
     
@@ -29,12 +25,12 @@ def main():
     for i in range(KEY_RANGE):
         print(f"pushing {i} with key {i%KEYS}")
         push(f"{i%KEYS}", i)
-        push_seq[i].append(i)
+        push_seq[i%KEYS].append(i)
 
     pull_seq = { _ : [] for _ in range(KEYS)}
     for i in range(KEY_RANGE):
         key, val = pull()
-        pull_seq[key].append(val)
+        pull_seq[int(key)].append(val)
         
     print(f'push_seq', push_seq)
     print(f'pull_seq', pull_seq)
