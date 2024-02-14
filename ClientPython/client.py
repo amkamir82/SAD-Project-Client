@@ -13,7 +13,7 @@ import json as jsonlib
 
 load_dotenv()
 
-def retry_request(max_retries=5):
+def retry_request(max_retries=3):
     """
     Decorator function that retries a request for a specified number of times.
     Args:
@@ -86,6 +86,8 @@ class Client:
             return None
         response.raise_for_status()
         json = response.json()
+        if json['key'] == None and json['value'] == None:
+            return None
         return json['key'], json['value']   # Return the response content if request is successful
             
     
@@ -129,7 +131,7 @@ class Client:
         dest_broker = self.route_push(key)
         url = dest_broker + self.push_api
         print(f"dest_broker: {url}")
-        response = requests.post(url, data=jsonlib.dumps({'key': key, 'value': value}), headers={"Content-Type": "application/json"})
+        response = requests.post(url, data=jsonlib.dumps({'key': key, 'value': str(value)}), headers={"Content-Type": "application/json"})
         print("reponse: ",response.text, response.status_code)
         response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
         return response.text
@@ -218,11 +220,12 @@ def subscription_func_wrapper(f, sub_id):
         function: The wrapped function that extracts the 'key' and 'value' from the request JSON and passes them to the original function.
 
     """
+    # @functools.wraps(f)
     def f_caller():
         data = request.get_json()
         f(data['key'], data['value']) # convert to byte?
         return 'Awli'
-    f_caller.__name__=f"{f_caller}{sub_id}"
+    # f_caller.__name__=f"{f_caller}{sub_id}"
     return f_caller
 
 def healthcheck():
@@ -250,7 +253,7 @@ def subscribe(f):
     sub_id = client.register_subscription()
     if sub_id == None:
         return 'Failed'
-    app.route('/subscribe-' + str(sub_id), methods=['POST'])(subscription_func_wrapper(f, sub_id))
+    app.route('/subscribe' + str(sub_id), endpoint=f'{sub_id}', methods=['POST'])(subscription_func_wrapper(f, sub_id))
     threading.Thread(
         target=healthcheck,
         daemon=True
