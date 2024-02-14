@@ -47,7 +47,7 @@ def main():
         subscribe(print)
     push_seq = { _ : [] for _ in range(KEYS)}
     for i in range(KEY_RANGE):
-        print(f"pushing {i} with key {i%KEYS}")
+        print(f"[*] pushing {i} with key {i%KEYS}")
         push(f"{i%KEYS}", i)
         push_seq[i].append(i)
     

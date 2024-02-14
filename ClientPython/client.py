@@ -30,8 +30,8 @@ def retry_request(max_retries=3):
                     return result
                 except requests.RequestException as e:
                     time.sleep(2)
-                    print('Request failed: \n', e)
-            print(f"Failed after {max_retries} retries.")
+                    print('[-] Request failed: \n', e)
+            print(f"[-] Failed after {max_retries} retries.")
             return None
         return wrapper_retry_request
     return decorator_retry_request
@@ -61,7 +61,7 @@ class Client:
             response = requests.post(url, data=jsonlib.dumps({'ip':self.my_ip, 'port':self.my_port}), timeout=20)
             if response.status_code == 200:
                 brokers = response.json()
-                print(f"response: {brokers}")
+                print(f"[+] Recieved brokers: {brokers}")
                 return brokers
         except:
             return None
@@ -103,13 +103,12 @@ class Client:
         """
         brokers = dict(self.brokers)
         while True:
-            print('brokers: ', brokers)
             key, dest_broker = self.route(brokers)
-            print('dest_broker: ', dest_broker)
             result = self.inner_pull(dest_broker=dest_broker)
             if result is not None:
                 url = dest_broker + self.ack_api
-                requests.post(url)                
+                requests.post(url)
+                print(f"[+] Pull successfull from {dest_broker}")
                 return result
             brokers.pop(key)
             
@@ -127,30 +126,32 @@ class Client:
         Returns:
             dict: The response from the server in JSON format.
         """
-        dest_broker = self.route_push(key)
-        url = dest_broker + self.push_api
-        print(f"dest_broker: {url}")
-        response = requests.post(url, data=jsonlib.dumps({'key': key, 'value': str(value)}), headers={"Content-Type": "application/json"})
-        print("reponse: ",response.text, response.status_code)
-        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
-        return response.text
-    
+        try:
+            dest_broker = self.route_push(key)
+            url = dest_broker + self.push_api
+            response = requests.post(url, data=jsonlib.dumps({'key': key, 'value': str(value)}), headers={"Content-Type": "application/json"})
+            response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+            print(f"[+] Push {key, value} successfull to {url}")
+            return response.text
+        except Exception as e:
+            print("[-]", e)
+            print(f"[-] Push {key, value} failed to {url}")
+        
     
     def update_brokers(self, brokers):
         with self.brokers_lock:
-            print(self.brokers)
             self.brokers = brokers
-            print('updated brokers:', self.brokers)
+            print('[+] Updated brokers:', self.brokers)
+            
     def send_register_request(self, url):
         try:
             response = requests.post(url, data=jsonlib.dumps({'ip':f'{self.my_ip}', 'port':f'{self.my_port}'}), timeout=20)
-            print(response)
             if response.status_code == 200:
                 json = response.json()
-                print(json)
+                print(f"[+] Registered subs successful with id: {json['id']}")
                 return json['id']
         except Exception as e:
-            print(e)
+            print("[-]",e)
             
         return None
         
@@ -166,7 +167,6 @@ class Client:
             _ + self.reg_subscribe_api for _ in [self.coordinator_url, self.backup_coordinator_url]
         ]
         for url in urls:
-            print(url)
             broker_id = self.send_register_request(url)
             if broker_id is not None:
                 return broker_id
@@ -175,11 +175,10 @@ class Client:
     def route_push(self, key):
         with self.brokers_lock:
             partition_count = len(self.brokers.keys())
-            print('partition count', partition_count)
             for item in self.brokers.keys():
                 md5 = hash_md5(key)
                 if int(hash_md5(key), 16) % partition_count == int(item) - 1:
-                    print('id of dest broker', item, 'hash_md5', md5)
+                    print(f'[*] Routed {key} to broker with id', item, 'with hash_md5', md5)
                     return self.brokers[item]
             
     def route(self, brokers):
