@@ -116,7 +116,6 @@ class Client:
 
             
             
-    @retry_request()    
     def push(self, key: str, value):
         """
             Pushes a key-value pair to the server.
