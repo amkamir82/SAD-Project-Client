@@ -207,7 +207,7 @@ def push(key: str, value):
     return client.push(key, value)
 
 
-def subscription_func_wrapper(f):
+def subscription_func_wrapper(f, sub_id):
     """
     A decorator function that wraps a subscription function.
 
@@ -222,6 +222,7 @@ def subscription_func_wrapper(f):
         data = request.get_json()
         f(data['key'], data['value']) # convert to byte?
         return 'Awli'
+    f_caller.__name__=f"{f_caller}{sub_id}"
     return f_caller
 
 def healthcheck():
@@ -249,7 +250,7 @@ def subscribe(f):
     sub_id = client.register_subscription()
     if sub_id == None:
         return 'Failed'
-    app.route('/subscribe-' + str(sub_id), methods=['POST'])(subscription_func_wrapper(f))
+    app.route('/subscribe-' + str(sub_id), methods=['POST'])(subscription_func_wrapper(f, sub_id))
     threading.Thread(
         target=healthcheck,
         daemon=True

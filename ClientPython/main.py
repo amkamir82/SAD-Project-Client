@@ -2,14 +2,16 @@ from client import pull, push, subscribe
 
 def main():
     
-    push('arshia', 'akhavan')
-    push('arshia2', 'akhavan1')
-    push('arshia3', 'akhavan2')
-    push('arshia4', 'akhavan3')
+    # push('arshia', 'akhavan1')
+    # push('arshia2', 'akhavan2')
+    # push('arshia3', 'akhavan3')
+    # push('arshia4', 'akhavan4')
+    # push('arshia5', 'akhavan5')
+    push('arshia6', 'akhavan6')
+
+    subscribe(print)
     
-    print(pull())
-
-
+    input()
     subscribe(print)
     input()
 
