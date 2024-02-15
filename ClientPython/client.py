@@ -53,7 +53,7 @@ class Client:
         self.my_ip = os.getenv('MY_IP')
         self.health_check_api = os.getenv('HEALTH_CHECK_API')
         self.sleep_interval = int(os.getenv('SLEEP_INTERVAL'))
-        
+
         self.init()
 
     def send_init_request(self, url):
@@ -65,7 +65,7 @@ class Client:
                 return brokers
         except:
             return None
-    
+
     def init(self):
         self.brokers_lock = threading.Lock()
         urls = [
@@ -89,8 +89,8 @@ class Client:
         if json['key'] == None and json['value'] == None:
             return None
         return json['key'], json['value']   # Return the response content if request is successful
-            
-    
+
+
     def pull(self):
         """
         Pulls data from the server using the specified API endpoint.
@@ -106,7 +106,7 @@ class Client:
             key, dest_broker = self.route(brokers)
             if key == None:
                 print("[-] Couldn't pull " )
-                return
+                return None, None
             result = self.inner_pull(dest_broker=dest_broker)
             if result is not None:
                 url = dest_broker + self.ack_api
@@ -114,10 +114,10 @@ class Client:
                 print(f"[+] Pull successfull from {dest_broker}")
                 return result
             brokers.pop(key)
-            
 
-            
-            
+
+
+
     def push(self, key: str, value):
         """
             Pushes a key-value pair to the server.
@@ -139,13 +139,13 @@ class Client:
         except Exception as e:
             print("[-]", e)
             print(f"[-] Push {key, value} failed to {url}")
-        
-    
+
+
     def update_brokers(self, brokers):
         with self.brokers_lock:
             self.brokers = brokers
             print('[+] Updated brokers:', self.brokers)
-            
+
     def send_register_request(self, url):
         try:
             response = requests.post(url, data=jsonlib.dumps({'ip':f'{self.my_ip}', 'port':f'{self.my_port}'}), timeout=20)
@@ -155,10 +155,10 @@ class Client:
                 return json['id']
         except Exception as e:
             print("[-]",e)
-            
+
         return None
-        
-            
+
+
     def register_subscription(self):
         """
         Sends a POST request to the coordinator URL to register a subscription.
@@ -174,7 +174,7 @@ class Client:
             if broker_id is not None:
                 return broker_id
 
-            
+
     def route_push(self, key):
         with self.brokers_lock:
             partition_count = len(self.brokers.keys())
@@ -183,7 +183,7 @@ class Client:
                 if int(hash_md5(key), 16) % partition_count == int(item) - 1:
                     print(f'[*] Routed {key} to broker with id', item, 'with hash_md5', md5)
                     return self.brokers[item]
-            
+
     def route(self, brokers):
         """
         Selects a random broker from the list of brokers.
@@ -238,13 +238,13 @@ def healthcheck():
     url2 = client.backup_coordinator_url + client.health_check_api
     while True:
         try:
-            res = requests.post(url1, data=jsonlib.dumps({'ip':client.my_ip, 'port':client.my_port}))    
+            res = requests.post(url1, data=jsonlib.dumps({'ip':client.my_ip, 'port':client.my_port}))
             if res.status_code != 200:
                 res = requests.post(url2, data=jsonlib.dumps({'ip':client.my_ip, 'port':client.my_port}))
         except:
             pass
         sleep(client.sleep_interval)
-        
+
 def subscribe(f):
     """
     Subscribes a function to a route and registers a subscription.
@@ -263,7 +263,7 @@ def subscribe(f):
         target=healthcheck,
         daemon=True
     ).start()
-    
+
     return
 
 threading.Thread(
